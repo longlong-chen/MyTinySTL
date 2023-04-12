@@ -2,11 +2,12 @@
  * @Author: chenlonglong 
  * @Date: 2023-04-08 10:37:04 
  * @Last Modified by: chenlonglong
- * @Last Modified time: 2023-04-08 10:48:57
+ * @Last Modified time: 2023-04-11 17:28:55
  */
 
 #include<iostream>
 #include<vector>
+#include "my_vector.h"
 
 // cplusplus.com officail code
 void official_example() {
@@ -44,12 +45,27 @@ void explicit_allocator() {
     std::cout << '\n';
 }
 
-int main() {
-    std::cout << "The result of official example: \n";
-    official_example();
+// text my_vector's constructor
+void my_vector_example() {
+    // constructors used in the same order as described above:
+    my_stl::my_vector<int> first;                                // empty vector of ints
+    my_stl::my_vector<int> second (4,100);                       // four ints with value 100
+    my_stl::my_vector<int> third (4); 
+    std::vector<int> tmp (4,100);
+    // my_stl::my_vector<int> fourth (tmp.begin(), tmp.end());  // iterating through tmp
+    my_stl::my_vector<int> fifth (third);                       // a copy of third
+    my_stl::my_vector<int> sixth {1, 2, 3 , 4}; 
+    my_stl::my_vector<int> (std::move(sixth));
+    
+}
 
-    std::cout << "The result of expliciting allocator: \n";
-    explicit_allocator(); 
+int main() {
+    // std::cout << "The result of official example: \n";
+    // official_example();
+
+    // std::cout << "The result of expliciting allocator: \n";
+    // explicit_allocator(); 
+    my_vector_example();
 
     return 0;
 }
