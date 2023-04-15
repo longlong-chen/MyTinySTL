@@ -12,6 +12,7 @@
 #include<initializer_list> /* std::initializer_list */
 #include<iterator> /* std::distance() */
 #include<iostream> /* std::out */
+#include "iterator.h"
 
 namespace my_stl {
     template <class T>
@@ -26,6 +27,9 @@ namespace my_stl {
         typedef const value_type& const_reference;
         typedef size_t      size_type;
         typedef ptrdiff_t   difference_type;
+
+        typedef my_stl::reverse_iterator<iterator> reverse_iterator;
+        typedef my_stl::reverse_iterator<const_iterator> const_reverse_iterator;
 
         typedef std::allocator<T> data_allocator;
         typedef std::allocator<T> allocator_type;
@@ -66,7 +70,12 @@ namespace my_stl {
         const_iterator cbegin() const noexcept { begin(); }
         const_iterator cend() const noexcept { end(); };
 
-        
+        reverse_iterator rbegin() noexcept { return reverse_iterator(end()); }
+        const_reverse_iterator rbegin() const noexcept { const_reverse_iterator(end()); }
+        reverse_iterator rend() noexcept { return reverse_iterator(begin()); }
+        const_reverse_iterator rend() const noexcept { return const_reverse_iterator(begin()); }
+        const_reverse_iterator crbegin() const noexcept { return rbegin(); }
+        const_reverse_iterator crend() const noexcept { return rend(); }
         
     };
 
