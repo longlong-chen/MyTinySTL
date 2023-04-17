@@ -123,7 +123,7 @@ namespace my_stl {
 
     template <class T>
     my_vector<T>::my_vector(const my_vector& x) {
-        std::cout << "copy Constructor\n";
+        // std::cout << "copy Constructor\n";
         const size_type n = std::distance(x.start, x.finish);
         start = data_allocator().allocate(n);
         finish = start + n;
@@ -141,7 +141,7 @@ namespace my_stl {
 
     template <class T> 
     my_vector<T>::my_vector(std::initializer_list<value_type> il) {
-        std::cout << "initializer list constructor\n";
+        // std::cout << "initializer list constructor\n";
         const size_type n = std::distance(il.begin(), il.end());
         start = data_allocator().allocate(n);
         finish = start + n;
