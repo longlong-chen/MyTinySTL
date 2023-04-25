@@ -10,6 +10,20 @@
 #include <iterator>
 #include <iostream>
 
+typedef typename std::input_iterator_tag input_iterator_tag;
+typedef typename std::output_iterator_tag output_iterator_tag;
+typedef typename std::forward_iterator_tag forward_iterator_tag;
+typedef typename std::bidirectional_iterator_tag bidirectional_iterator_tag;
+typedef typename std::random_access_iterator_tag random_access_iterator_tag;
+
+template <class _Iterator>
+inline typename std::iterator_traits<_Iterator>::iterator_category 
+__iterator_category(const _Iterator&) {
+    typedef typename std::iterator_traits<_Iterator>::iterator_category _Category;
+    return _Category();
+}
+#define __ITERATOR_CATEGORY(__i) __iterator_category(__i)
+
 namespace my_stl {
     template <class _Iterator>
     class reverse_iterator {

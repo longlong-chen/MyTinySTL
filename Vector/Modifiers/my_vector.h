@@ -15,6 +15,7 @@
 #include<algorithm> /* copy / move */
 #include<cassert> /* assert */
 #include "iterator.h"
+#include "type_traits.h"
 
 namespace my_stl {
     template <class T>
@@ -104,8 +105,11 @@ namespace my_stl {
         /* Modifiers */
         iterator erase(const_iterator position);
         iterator erase(const_iterator first, const_iterator last);
-        template <class InputIterator> void assign(InputIterator first, InputIterator last);
-        void assign(size_type n, const value_type& val);
+        template <class InputIterator> void assign(InputIterator first, InputIterator last) {
+            typedef typename _Is_integer<InputIterator>::_Integral _Integral;
+
+        }
+        void assign(size_type n, const value_type& val) { fill_assign(n, val); }
         void assign(std::initializer_list<value_type> il);
         void swap(my_vector& x);
         void pop_back() { --finish; data_allocator().destroy(finish); }
@@ -113,9 +117,26 @@ namespace my_stl {
 
         /* others */
         void fill_assign(size_type n, const value_type& val);
+        template <Integer> void assign_dispatch(Integer n, Integer val, __true_type) { fill_assign((size_type) n, val); }
+        template <class InputIterator> void assign_dispatch(InputIterator first, InputIterator last, __false_type) { assign_aux(first, last, __ITERATOR_CATEGORY(first)); }
+        template <class InputIterator> void assign_aux(InputIterator first, InputIterator last, input_iterator_tag);
+        template <class ForwardIterator> void assign_aux(ForwardIterator first, ForwardIterator last, forward_iterator_tag);
     };
 
     /* others */
+    template <class T> template <class InputIterator>
+    void my_vector<T>::assign_aux(InputIterator first, InputIterator last, input_iterator_tag) {
+        iterator cur = begin();
+        for(; first != last && cur != end(); ++cur, ++first) *cur = *first;
+        if(first == last) erase(cur, end());
+        else insert(end(), first, last);
+    }
+
+    template <class T> template <class ForwardIterator> 
+    void my_vector<T>::assign_aux(ForwardIterator first, ForwardIterator last, forward_iterator_tag) {
+        
+    }
+
     template <class T>
     void my_vector<T>::fill_assign(size_type n, const value_type& val) {
         if(n > capacity()) {
@@ -132,6 +153,8 @@ namespace my_stl {
     }
 
     /* Modifiers */
+
+
     template <class T>
     void my_vector<T>::swap(my_vector& x) {
         std::swap(start, x.start);
@@ -140,7 +163,7 @@ namespace my_stl {
     }
 
     template <class T>
-    my_vector<T>::iterator my_vector<T>::erase(const_iterator position) {
+    typename my_vector<T>::iterator my_vector<T>::erase(const_iterator position) {
         assert(position >= begin() && position < end());
         iterator xpos = start + (position - begin());
         std::move(xpos + 1, finish, xpos);
@@ -150,7 +173,7 @@ namespace my_stl {
     }
 
     template <class T>
-    my_vector<T>::iterator my_vector<T>::erase(const_iterator first, const_iterator last) {
+    typename my_vector<T>::iterator my_vector<T>::erase(const_iterator first, const_iterator last) {
         assert(first >= begin() && last <= end() && first <= last);
         const size_type n = first - begin();
         iterator xpos = start + (first - begin());
