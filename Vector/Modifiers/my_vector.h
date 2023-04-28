@@ -2,7 +2,7 @@
  * @Author: chenlonglong 
  * @Date: 2023-04-08 11:55:20 
  * @Last Modified by: chenlonglong
- * @Last Modified time: 2023-04-23 09:51:00
+ * @Last Modified time: 2023-04-28 11:25:36
  */
 #ifndef __MYTINYSTL_VECTOR_H
 #define __MYTINYSTL_VECTOR_H
@@ -44,7 +44,7 @@ namespace my_stl {
         explicit my_vector();
         explicit my_vector(size_type n);
         my_vector(size_type n, const value_type& val);
-        // template <class InputIterator> my_vector(InputIterator first, InputIterator last);
+        template <class InputIterator> my_vector(InputIterator first, InputIterator last);
         my_vector(const my_vector& x);
         /*  move constructor */
         my_vector(my_vector&& x) noexcept;
@@ -83,8 +83,8 @@ namespace my_stl {
         /* Element access */
         reference operator[](size_type n) { return *(begin() + n); }
         const_reference operator[](size_type n) const { return *(begin() + n); }
-        reference at(size_type n) { if(n >= size()) throw std::out_of_range("vector<T>::at() subscript out of range"); return (*this)[n]; }
-        const_reference at(size_type n) const { if(n >= size()) throw std::out_of_range("vector<T>::at() subscript out of range"); return (*this)[n]; } 
+        reference at(size_type n) { if(n >= size()) throw std::out_of_range("my_vector<T>::at() subscript out of range"); return (*this)[n]; }
+        const_reference at(size_type n) const { if(n >= size()) throw std::out_of_range("my_vector<T>::at() subscript out of range"); return (*this)[n]; } 
         reference front() { return *begin(); }
         const_reference front() const { return *begin(); }
         reference back() { return *(end() - 1); }
@@ -112,8 +112,11 @@ namespace my_stl {
         void assign(size_type n, const value_type& val) { fill_assign(n, val); }
         void assign(std::initializer_list<value_type> il);
         void swap(my_vector& x);
-        void pop_back() { --finish; data_allocator().destroy(finish); }
+        void pop_back() { --finish; destroy(finish); }
         void clear() noexcept { erase(begin(), end()); }
+        void push_back(const value_type& val);
+        void push_back(value_type&& val);
+        template <class... Args> void emplace(Args&&... args);
 
         /* others */
         void fill_assign(size_type n, const value_type& val);
@@ -121,9 +124,28 @@ namespace my_stl {
         template <class InputIterator> void assign_dispatch(InputIterator first, InputIterator last, __false_type) { assign_aux(first, last, __ITERATOR_CATEGORY(first)); }
         template <class InputIterator> void assign_aux(InputIterator first, InputIterator last, input_iterator_tag);
         template <class ForwardIterator> void assign_aux(ForwardIterator first, ForwardIterator last, forward_iterator_tag);
+        template <class Integer> initialize_aux(Integer n, Integer value, __true_type);
+        template <class InputIterator> initialize_aux(InputIterator first, InputIterator last, __false_type);
+    
+    protected:
+        template <class InputIterator> void range_initialize(InputIterator first, InputIterator last, input_iterator_tag);
+        template <class ForwardIterator> void range_initialize(ForwardIterator first, ForwardIterator last, forward_iterator_tag);
     };
 
     /* others */
+    template<class T> template <class InputIterator>
+    void my_vector<T>::range_initialize(InputIterator first, InputIterator last, input_iterator_tag) {
+        for(; first != last; ++first) push_back(*first);
+    }
+
+    template<class T> template <class ForwardIterator>
+    void my_vector<T>::range_initialize(ForwardIterator first, ForwardIterator last, forward_iterator_tag) {
+        const size_type n = distance(first, last);
+        start = data_allocator().allocate(n);
+        end_of_storage = start + n;
+        finish = std::uninitialized_copy(first, last, start);
+    }
+
     template <class T> template <class InputIterator>
     void my_vector<T>::assign_aux(InputIterator first, InputIterator last, input_iterator_tag) {
         iterator cur = begin();
@@ -134,7 +156,11 @@ namespace my_stl {
 
     template <class T> template <class ForwardIterator> 
     void my_vector<T>::assign_aux(ForwardIterator first, ForwardIterator last, forward_iterator_tag) {
-        
+        const size_type len = distance(first, last);
+
+        if(len > capacity()) {
+
+        }
     }
 
     template <class T>
@@ -206,15 +232,11 @@ namespace my_stl {
         std::uninitialized_fill_n(start, n, val);
     }
 
-    // template <class T>
-    // template <class InputIterator>
-    // my_vector<T>::my_vector(InputIterator first, InputIterator last) {
-    //     const size_type n = std::distance(first, last);
-    //     start = data_allocator().allocate(n);
-    //     finish = start + n;
-    //     end_of_storage = finish;
-    //     std::uninitialized_copy(first, last, start);
-    // }
+    template <class T> template <class InputIterator>
+    my_vector<T>::my_vector(InputIterator first, InputIterator last) {
+        typedef typename _Is_integer<InputIterator>::_Integral _Integral;
+        initialize_aux(first, last, _Integral());
+    }
 
     template <class T>
     my_vector<T>::my_vector(const my_vector& x) {
