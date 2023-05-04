@@ -2,7 +2,7 @@
  * @Author: chenlonglong 
  * @Date: 2023-04-08 11:55:20 
  * @Last Modified by: chenlonglong
- * @Last Modified time: 2023-04-28 11:25:36
+ * @Last Modified time: 2023-05-04 11:18:17
  */
 #ifndef __MYTINYSTL_VECTOR_H
 #define __MYTINYSTL_VECTOR_H
@@ -12,10 +12,12 @@
 #include<initializer_list> /* std::initializer_list */
 #include<iterator> /* std::distance() */
 #include<iostream> /* std::out */
-#include<algorithm> /* copy / move */
+#include<algorithm> /* copy / move  / copy_backward */
 #include<cassert> /* assert */
 #include "iterator.h"
 #include "type_traits.h"
+#include "construct_destroy.h"
+#include "mystl_config.h"
 
 namespace my_stl {
     template <class T>
@@ -115,8 +117,9 @@ namespace my_stl {
         void pop_back() { --finish; destroy(finish); }
         void clear() noexcept { erase(begin(), end()); }
         void push_back(const value_type& val);
+        void push_back();
         void push_back(value_type&& val);
-        template <class... Args> void emplace(Args&&... args);
+        template <class... Args> void emplace(const_iterator position, Args&&... args);
 
         /* others */
         void fill_assign(size_type n, const value_type& val);
@@ -130,9 +133,73 @@ namespace my_stl {
     protected:
         template <class InputIterator> void range_initialize(InputIterator first, InputIterator last, input_iterator_tag);
         template <class ForwardIterator> void range_initialize(ForwardIterator first, ForwardIterator last, forward_iterator_tag);
+        template <class ForwardIterator> iterator allocate_and_copy(size_type n , ForwardIterator first, ForwardIterator last) {
+            iterator result = data_allocator().allocate(n);
+            std::uninitialized_copy(first, last, result);
+            return result;
+        }
+        void insert_aux(iterator position, const value_type& val);
+        void insert_aux(iterator position);
     };
 
     /* others */
+    template <class T>
+    void my_vector<T>::insert_aux(iterator position, const value_type& val) {
+        if(finish != end_of_storage) {
+            construct(finish, *(finish - 1));
+            ++finish;
+            value_type val_copy = val;
+            std::copy_backward(position, finish - 2, finish - 1);
+            *position = val_copy;
+        }
+        else {
+            const size_type old_size = size();
+            const size_type len = old_size != 0 ? 2 * old_size : 1;
+            iterator new_start = data_allocator().allocate(len);
+            iterator new_finish = new_start;
+            MYSTL_TRY {
+                new_finish = std::uninitialized_copy(start, position, new_start);
+                construct(new_finish, val);
+                ++new_finish;
+                new_finish = std::uninitialized_copy(position, finish, new_finish);
+            }
+            MYSTL_UNWIND((destroy(new_start, new_finish),data_allocator().deallocate(new_start,len)));
+            destroy(begin(), end());
+            data_allocator().deallocate(start, end_of_storage - start);
+            start = new_start;
+            finish = new_finish;
+            end_of_storage = new_start + len;
+        }
+    }
+
+    template <class T>
+    void my_vector<T>::insert_aux(iterator position) {
+        if(finish != end_of_storage) {
+            construct(finish, *(finish - 1));
+            ++finish;
+            std::copy_backward(position, finish - 2, finish - 1);
+            *position = T();
+        }
+        else {
+            const size_type old_size = size();
+            const size_type len = old_size != 0 ? 2 * old_size : 1;
+            iterator new_start = data_allocator().allocate(len);
+            iterator new_finish = new_start;
+            MYSTL_TRY {
+                new_finish = std::uninitialized_copy(start, position, new_start);
+                construct(new_finish);
+                ++new_finish;
+                new_finish = std::uninitialized_copy(position, finish, new_finish);
+            }
+            MYSTL_UNWIND((destroy(new_start,new_finish),data_allocator().deallocate(new_start,len)));
+            destroy(begin(), end());
+            data_allocator().deallocate(start, end_of_storage - start);
+            start = new_start;
+            finish = new_finish;
+            end_of_storage = new_start + len;    
+        }
+    }
+
     template<class T> template <class InputIterator>
     void my_vector<T>::range_initialize(InputIterator first, InputIterator last, input_iterator_tag) {
         for(; first != last; ++first) push_back(*first);
@@ -159,7 +226,22 @@ namespace my_stl {
         const size_type len = distance(first, last);
 
         if(len > capacity()) {
-
+            iterator tmp = allocate_and_copy(len, first, last);
+            destroy(start, finish);
+            data_allocator().deallocate(start, end_of_storage - start);
+            start = tmp;
+            end_of_storage = finish = start + len;
+        }
+        else if(size() >= len) {
+            iterator new_finish = std::copy(first, last, start);
+            destroy(new_finish, finish);
+            finish = new_finish;
+        }
+        else {
+            ForwardIterator mid = first;
+            advance(mid, size());
+            std::copy(first, mid, start);
+            finish = std::uninitialized_copy(mid, last, finish);
         }
     }
 
@@ -179,7 +261,32 @@ namespace my_stl {
     }
 
     /* Modifiers */
+    template <class T>
+    void my_vector<T>::push_back(const value_type& val) {
+        if(finish != end_of_storage) {
+            construct(finish, val);
+            ++finish;
+        }
+        else {
+            insert_aux(end(), val);
+        }
+    }
 
+    template <class T>
+    void my_vector<T>::push_back() {
+        if(finish != end_of_storage) {
+            construct(finish);
+            ++finish;
+        }
+        else {
+            insert_aux(end());
+        }
+    }
+
+    template <class T> 
+    void my_vector<T>::push_back(value_type&& val) {
+        // wait emplace
+    }
 
     template <class T>
     void my_vector<T>::swap(my_vector& x) {
