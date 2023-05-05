@@ -2,7 +2,7 @@
  * @Author: chenlonglong 
  * @Date: 2023-04-08 11:55:20 
  * @Last Modified by: chenlonglong
- * @Last Modified time: 2023-05-04 11:18:17
+ * @Last Modified time: 2023-05-04 11:40:22
  */
 #ifndef __MYTINYSTL_VECTOR_H
 #define __MYTINYSTL_VECTOR_H
@@ -120,6 +120,12 @@ namespace my_stl {
         void push_back();
         void push_back(value_type&& val);
         template <class... Args> void emplace(const_iterator position, Args&&... args);
+        iterator insert(const_iterator position, const value_type& val);
+        iterator insert(const_iterator position);
+        iterator insert(const_iterator position, size_type n, const value_type& val);
+        template <class InputIterator> iterator insert(const_iterator position, InputIterator first, InputIterator last);
+        iterator insert(const_iterator position, value_type&& val);
+        iterator insert(const_iterator position, std::initializer_list<value_type> il);
 
         /* others */
         void fill_assign(size_type n, const value_type& val);
@@ -127,9 +133,11 @@ namespace my_stl {
         template <class InputIterator> void assign_dispatch(InputIterator first, InputIterator last, __false_type) { assign_aux(first, last, __ITERATOR_CATEGORY(first)); }
         template <class InputIterator> void assign_aux(InputIterator first, InputIterator last, input_iterator_tag);
         template <class ForwardIterator> void assign_aux(ForwardIterator first, ForwardIterator last, forward_iterator_tag);
-        template <class Integer> initialize_aux(Integer n, Integer value, __true_type);
-        template <class InputIterator> initialize_aux(InputIterator first, InputIterator last, __false_type);
-    
+        template <class Integer> void initialize_aux(Integer n, Integer value, __true_type);
+        template <class InputIterator> void initialize_aux(InputIterator first, InputIterator last, __false_type);
+        void fill_insert(iterator position, size_type n, const value_type& val);
+
+
     protected:
         template <class InputIterator> void range_initialize(InputIterator first, InputIterator last, input_iterator_tag);
         template <class ForwardIterator> void range_initialize(ForwardIterator first, ForwardIterator last, forward_iterator_tag);
@@ -140,9 +148,116 @@ namespace my_stl {
         }
         void insert_aux(iterator position, const value_type& val);
         void insert_aux(iterator position);
+        // This function is only called by the constructor.
+        template <class ForwardIterator> void range_insert(iterator position, ForwardIterator first, ForwardIterator last, forward_iterator_tag);
+        template <class InputIterator> void range_insert(iterator position, InputIterator first, InputIterator last, input_iterator_tag);
     };
 
     /* others */
+    template <class T>
+    void my_vector<T>::fill_insert(iterator position, size_type n, const value_type& val) {
+        if(n != 0) {
+            if(size_type(end_of_storage - finish) >= n) {
+                value_type val_copy = val;
+                const size_type elems_after = finish - position;
+                iterator old_finish = finish;
+                if(elems_after > n) {
+                    std::uninitialized_copy(finish - n, finish, finish);
+                    finish += n;
+                    std::copy_backward(position, old_finish - n, old_finish);
+                    std::fill(position, position + n, val_copy);
+                }
+                else {
+                    std::uninitialized_fill_n(finish, n - elems_after, val_copy);
+                    finish += n - elems_after;
+                    std::uninitialized_copy(position, old_finish, finish);
+                    finish += elems_after;
+                    std::fill(position, old_finish, val_copy);
+                }
+            }
+            else {
+                const size_type old_size = size();
+                const size_type len = old_size + max(old_size, n);
+                iterator new_start = data_allocator().allocate(len);
+                iterator new_finish = new_start;
+                MYSTL_TRY {
+                    new_finish = std::uninitialized_copy(start, position, new_start);
+                    new_finish = std::uninitialized_fill_n(new_finish, n, val);
+                    new_finish = std::uninitialized_copy(position, finish, new_finish);
+                }
+                MYSTL_UNWIND((destroy(new_start,new_finish),data_allocator().deallocate(new_start,len)));
+                destroy(start, finish);
+                data_allocator().deallocate(start, end_of_storage - start);
+                start = new_start;
+                finish = new_finish;
+                end_of_storage = new_start + len;
+            }
+        }
+    } 
+
+    template <class T> template <class ForwardIterator> 
+    void my_vector<T>::range_insert(iterator position, ForwardIterator first, ForwardIterator last, forward_iterator_tag) {
+        if(first != last) {
+            const size_type n = distance(first, last);
+            if(size_type(end_of_storage - finish) >= n) {
+                const size_type elems_after = finish - position;
+                iterator old_finish = finish;
+                if(elems_after > n) {
+                    std::uninitialized_copy(finish - n, finish, finish);
+                    finish += n;
+                    std::copy_backward(position, old_finish - n, old_finish);
+                    std::copy(first, last, position);
+                }
+                else {
+                    ForwardIterator mid = first;
+                    advance(mid, elems_after);
+                    std::uninitialized_copy(mid, last, finish);
+                    finish += n - elems_after;
+                    std::uninitialized_copy(position, old_finish, finish);
+                    finish += elems_after;
+                    std::copy(first, mid, position);
+                }
+            }
+            else {
+                const size_type old_size = size();
+                const size_type len = old_size + max(old_size, n);
+                iterator new_start = data_allocator().allocate(len);
+                iterator new_finish = new_start;
+                MYSTL_TRY {
+                    new_finish = std::uninitialized_copy(start, position, new_start);
+                    new_finish = std::uninitialized_copy(first, last, new_finish);
+                    new_finish = std::uninitialized_copy(position, finish, new_finish);
+                }
+                MYSTL_UNWIND((destroy(new_start,new_finish),data_allocator().deallocate(new_start,len)));
+                destroy(start, finish);
+                data_allocator().deallocate(start, end_of_storage - start);
+                start = new_start;
+                finish = new_finish;
+                end_of_storage = new_start + len;
+            }
+        }
+    }
+
+    template<class T> template <class InputIterator> 
+    void my_vector<T>::range_insert(iterator position, InputIterator first, InputIterator last, input_iterator_tag) {
+        for(; first != last; ++first) {
+            position = insert(position, *first);
+            ++position;
+        }
+    }
+
+    template <class T> template <class Integer> 
+    void my_vector<T>::initialize_aux(Integer n, Integer value, __true_type) {
+        start = data_allocator().allocate(n);
+        end_of_storage = start + n;
+        finish = std::uninitialized_fill_n(start, n, value);
+    }
+
+    template <class T> template <class InputIterator>
+    void my_vector<T>::initialize_aux(InputIterator first, InputIterator last, __false_type) {
+        range_initialize(first, last, __ITERATOR_CATEGORY(first));
+    }
+
     template <class T>
     void my_vector<T>::insert_aux(iterator position, const value_type& val) {
         if(finish != end_of_storage) {
@@ -261,6 +376,32 @@ namespace my_stl {
     }
 
     /* Modifiers */
+    template <class T>
+    typename my_vector<T>::iterator my_vector<T>::insert(const_iterator position, const value_type& val) {
+        size_type n = position - begin();
+        if(finish != end_of_storage && position == end()) {
+            construct(finish, val);
+            ++finish;
+        }
+        else {
+            insert_aux(position, val);
+        }
+        return begin() + n;
+    }
+
+    template <class T>
+    typename my_vector<T>::iterator my_vector<T>::insert(const_iterator position) {
+        size_type n = position - begin();
+        if(finish != end_of_storage && position == end()) {
+            construct(finish);
+            ++finish;
+        }
+        else {
+            insert_aux(position);
+        }
+        return begin() + n;
+    }
+
     template <class T>
     void my_vector<T>::push_back(const value_type& val) {
         if(finish != end_of_storage) {
